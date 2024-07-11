@@ -8,18 +8,24 @@ from typing import Dict, NamedTuple
 
 class Wrapper(NamedTuple):
     name: str
-    header: str
+    header: str = "#!/bin/bash"
     footer: str = ""
     prefix: str = ""
     suffix: str = ""
     executor: str = "bash {script}"
     file_suffix: str = ".sh"
 
-    def get_executor_cmd(self, scriptfile: str):
-        return self.executor.format(script=scriptfile)
+    def get_executor_cmd(self, scriptfile: str, stepname: str):
+        return self.executor.format(script=scriptfile, stepname=stepname)
 
-    def wrap(self, code: str):
-        return f"{self.header}\n{self.prefix}{code}{self.suffix}\n{self.footer}"
+    def wrap(self, code: str, stepname: str):
+        kw = {"stepname": stepname}
+        header = self.header.format(**kw)
+        prefix = self.prefix.format(**kw)
+        code = code.format(**kw)
+        suffix = self.suffix.format(**kw)
+        footer = self.footer.format(**kw)
+        return f"{header}\n{prefix}{code}{suffix}\n{footer}"
 
 def parse_spec(path: Path):
     text = path.read_text()
@@ -43,13 +49,14 @@ def wrap(spec: Dict[str, Wrapper], scriptdir: Path, workdir: Path, code: str):
 
     for wrapper_name in reversed(wrappers):
         wrapper = spec[wrapper_name]
-        wrapped_code = wrapper.wrap(code)
-        scriptfile = f"{wrapper.name}_{hashlib.sha256(wrapped_code.encode('utf8')).hexdigest()}{wrapper.file_suffix}"
+        stepname = f"{wrapper.name}_{hashlib.sha256(code.encode('utf8')).hexdigest()[:10]}"
+        wrapped_code = wrapper.wrap(code, stepname)
+        scriptfile = f"{stepname}_{hashlib.sha256(wrapped_code.encode('utf8')).hexdigest()}{wrapper.file_suffix}"
         scriptpath = scriptdir / scriptfile
         with scriptpath.open("w") as f:
             print(wrapped_code, file=f)
 
-        code = wrapper.get_executor_cmd(scriptpath.absolute())
+        code = wrapper.get_executor_cmd(scriptpath.absolute(), stepname)
 
     return code
 
