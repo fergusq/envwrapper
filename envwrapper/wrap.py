@@ -24,7 +24,7 @@ class Wrapper(NamedTuple):
 def parse_spec(path: Path):
     text = path.read_text()
     wrappers = []
-    for obj in yaml.load_all(text):
+    for obj in yaml.load_all(text, Loader=yaml.SafeLoader):
         wrappers.append(Wrapper(**obj))
 
     return {wrapper.name: wrapper for wrapper in wrappers}
